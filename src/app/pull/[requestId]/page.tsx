@@ -27,6 +27,7 @@ export default function PullPage() {
   const [viewState, setViewState] = useState<ViewState>('loading')
   const [activeItemId, setActiveItemId] = useState<string | null>(null)
   const [showNumberPad, setShowNumberPad] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const { data: request, isLoading, error } = useRequestDetails(requestId)
   const startProcessing = useStartProcessing()
@@ -140,7 +141,7 @@ export default function PullPage() {
   const handleSubmitPull = async () => {
     if (!currentSession || !session?.user?.email) return
 
-    setViewState('submitting')
+    setIsSubmitting(true)
 
     try {
       const entries = currentSession.entries.map((e) => ({
@@ -159,7 +160,7 @@ export default function PullPage() {
     } catch (err) {
       console.error('Failed to submit pull:', err)
       // Stay on summary for retry
-      setViewState('summary')
+      setIsSubmitting(false)
     }
   }
 
@@ -253,7 +254,7 @@ export default function PullPage() {
         entries={currentSession?.entries || []}
         onBack={handleBackToPulling}
         onSubmit={handleSubmitPull}
-        isSubmitting={viewState === 'submitting'}
+        isSubmitting={isSubmitting}
       />
     )
   }
