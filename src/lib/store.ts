@@ -1,0 +1,139 @@
+import { create } from 'zustand'
+import { PullEntry, PullSession } from '@/types'
+
+interface PullStore {
+  // Current pull session
+  currentSession: PullSession | null
+
+  // Actions
+  startSession: (
+    requestId: string,
+    requestNumber: string,
+    techName: string,
+    truckNumber: string | null,
+    priority: 'normal' | 'urgent' | 'asap',
+    items: Omit<PullEntry, 'qtyPulled' | 'isPulled'>[]
+  ) => void
+
+  updateEntry: (itemId: string, qtyPulled: number) => void
+
+  markEntryPulled: (itemId: string, qtyPulled: number) => void
+
+  completeSession: () => void
+
+  clearSession: () => void
+
+  // Computed values
+  getProgress: () => { pulled: number; total: number; percentage: number }
+
+  getHasShortages: () => boolean
+
+  getTotalPulled: () => number
+
+  getTotalRequested: () => number
+}
+
+export const usePullStore = create<PullStore>((set, get) => ({
+  currentSession: null,
+
+  startSession: (requestId, requestNumber, techName, truckNumber, priority, items) => {
+    const entries: PullEntry[] = items.map(item => ({
+      ...item,
+      qtyPulled: 0,
+      isPulled: false,
+    }))
+
+    set({
+      currentSession: {
+        requestId,
+        requestNumber,
+        techName,
+        truckNumber,
+        priority,
+        entries,
+        startedAt: new Date().toISOString(),
+        completedAt: null,
+      },
+    })
+  },
+
+  updateEntry: (itemId, qtyPulled) => {
+    const session = get().currentSession
+    if (!session) return
+
+    set({
+      currentSession: {
+        ...session,
+        entries: session.entries.map(entry =>
+          entry.itemId === itemId
+            ? { ...entry, qtyPulled, isPulled: false }
+            : entry
+        ),
+      },
+    })
+  },
+
+  markEntryPulled: (itemId, qtyPulled) => {
+    const session = get().currentSession
+    if (!session) return
+
+    set({
+      currentSession: {
+        ...session,
+        entries: session.entries.map(entry =>
+          entry.itemId === itemId
+            ? { ...entry, qtyPulled, isPulled: true }
+            : entry
+        ),
+      },
+    })
+  },
+
+  completeSession: () => {
+    const session = get().currentSession
+    if (!session) return
+
+    set({
+      currentSession: {
+        ...session,
+        completedAt: new Date().toISOString(),
+      },
+    })
+  },
+
+  clearSession: () => {
+    set({ currentSession: null })
+  },
+
+  getProgress: () => {
+    const session = get().currentSession
+    if (!session) return { pulled: 0, total: 0, percentage: 0 }
+
+    const pulled = session.entries.filter(e => e.isPulled).length
+    const total = session.entries.length
+    const percentage = total > 0 ? Math.round((pulled / total) * 100) : 0
+
+    return { pulled, total, percentage }
+  },
+
+  getHasShortages: () => {
+    const session = get().currentSession
+    if (!session) return false
+
+    return session.entries.some(e => e.isPulled && e.qtyPulled < e.requestedQty)
+  },
+
+  getTotalPulled: () => {
+    const session = get().currentSession
+    if (!session) return 0
+
+    return session.entries.reduce((sum, e) => sum + e.qtyPulled, 0)
+  },
+
+  getTotalRequested: () => {
+    const session = get().currentSession
+    if (!session) return 0
+
+    return session.entries.reduce((sum, e) => sum + e.requestedQty, 0)
+  },
+}))
