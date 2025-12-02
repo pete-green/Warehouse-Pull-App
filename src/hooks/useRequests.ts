@@ -39,9 +39,10 @@ export function usePendingRequests() {
 
       return sorted
     },
-    staleTime: 30 * 1000, // 30 seconds
-    refetchInterval: 30 * 1000, // Auto-refresh every 30 seconds
+    staleTime: 5 * 1000, // 5 seconds - data goes stale quickly
+    refetchInterval: 10 * 1000, // Auto-refresh every 10 seconds
     refetchOnWindowFocus: true,
+    refetchOnMount: 'always', // Always refetch when component mounts
   })
 }
 
