@@ -2,6 +2,7 @@ import { NextAuthOptions } from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
 
 export const authOptions: NextAuthOptions = {
+  debug: true, // Enable debug logging
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -17,7 +18,10 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async signIn({ user }) {
+    async signIn({ user, account, profile }) {
+      console.log('SignIn callback - user:', user?.email)
+      console.log('SignIn callback - account provider:', account?.provider)
+
       // Restrict to company domain
       const email = user.email || ''
       const allowedDomain = 'gogreenplumb.com'
@@ -27,6 +31,7 @@ export const authOptions: NextAuthOptions = {
         return false
       }
 
+      console.log('SignIn callback - allowing user:', email)
       return true
     },
     async session({ session, token }) {
