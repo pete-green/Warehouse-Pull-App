@@ -33,9 +33,9 @@ export default function PullPage() {
   const startProcessing = useStartProcessing()
   const recordPulls = useRecordPulls()
 
-  // Get part IDs for image lookup
-  const partIds = request?.items?.map((item) => item.part_id) || []
-  const { data: partImages } = usePartImages(partIds)
+  // Get part numbers for image lookup (parts.part_id matches our_part_number)
+  const partNumbers = request?.items?.map((item) => item.our_part_number) || []
+  const { data: partImages } = usePartImages(partNumbers)
 
   // Pull store
   const {
@@ -56,11 +56,11 @@ export default function PullPage() {
       const items =
         request.items?.map((item) => ({
           itemId: item.id,
-          partId: item.part_id,
+          partId: item.our_part_number, // Use our_part_number as the lookup key
           ourPartNumber: item.our_part_number,
           description: item.description,
           requestedQty: item.quantity,
-          imageUrl: partImages?.[item.part_id] || null,
+          imageUrl: partImages?.[item.our_part_number] || null,
         })) || []
 
       startSession(

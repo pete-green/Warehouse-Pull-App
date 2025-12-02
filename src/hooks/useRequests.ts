@@ -155,27 +155,28 @@ export function useRecordPulls() {
   })
 }
 
-// Get part images for items
-export function usePartImages(partIds: string[]) {
+// Get part images for items (uses our_part_number since that matches parts.part_id)
+export function usePartImages(partNumbers: string[]) {
   return useQuery({
-    queryKey: ['part-images', partIds],
+    queryKey: ['part-images', partNumbers],
     queryFn: async () => {
-      if (partIds.length === 0) return {}
+      if (partNumbers.length === 0) return {}
 
       const { data, error } = await supabase
         .from('parts')
-        .select('part_id, image_url')
-        .in('part_id', partIds)
+        .select('part_id, our_part_number, image_url')
+        .in('part_id', partNumbers)
 
       if (error) throw error
 
       const imageMap: Record<string, string | null> = {}
       data?.forEach((part) => {
+        // Map by part_id (which matches our_part_number in request items)
         imageMap[part.part_id] = part.image_url
       })
 
       return imageMap
     },
-    enabled: partIds.length > 0,
+    enabled: partNumbers.length > 0,
   })
 }
