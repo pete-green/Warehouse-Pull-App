@@ -49,6 +49,20 @@ export default function PullPage() {
     getHasShortages,
   } = usePullStore()
 
+  // Clear session if it's for a different request
+  useEffect(() => {
+    if (currentSession && currentSession.requestId !== requestId) {
+      clearSession()
+    }
+  }, [requestId, currentSession, clearSession])
+
+  // If we already have a valid session for this request, go straight to pulling
+  useEffect(() => {
+    if (currentSession && currentSession.requestId === requestId && viewState === 'loading') {
+      setViewState('pulling')
+    }
+  }, [currentSession, requestId, viewState])
+
   // Initialize session when request loads
   useEffect(() => {
     if (request && !currentSession && viewState === 'loading') {
