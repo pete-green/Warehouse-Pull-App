@@ -12,11 +12,12 @@ import {
 import { usePullStore } from '@/lib/store'
 import { saveSessionOffline, updateEntryOffline } from '@/lib/offline-db'
 import PullItemCard from '@/components/PullItemCard'
+import ReadOnlyItemCard from '@/components/ReadOnlyItemCard'
 import NumberPad from '@/components/NumberPad'
 import PullSummary from '@/components/PullSummary'
 import OfflineIndicator from '@/components/OfflineIndicator'
 
-type ViewState = 'loading' | 'pulling' | 'summary' | 'submitting' | 'complete'
+type ViewState = 'loading' | 'pulling' | 'summary' | 'submitting' | 'complete' | 'readonly'
 
 export default function PullPage() {
   const params = useParams()
@@ -41,6 +42,7 @@ export default function PullPage() {
   const {
     currentSession,
     startSession,
+    startSessionWithExistingData,
     updateEntry,
     markEntryPulled,
     completeSession,
@@ -66,7 +68,7 @@ export default function PullPage() {
   // Initialize session when request loads
   useEffect(() => {
     if (request && !currentSession && viewState === 'loading') {
-      // Start the pull session
+      // Build items array (used for both new and existing sessions)
       const items =
         request.items?.map((item) => ({
           itemId: item.id,
@@ -77,6 +79,30 @@ export default function PullPage() {
           imageUrl: partImages?.[item.our_part_number] || null,
         })) || []
 
+      // Check if this request was already completed (has pull_completed_at set)
+      if (request.pull_completed_at) {
+        // Load existing pull data in read-only mode
+        const existingPulls =
+          request.items?.map((item) => ({
+            itemId: item.id,
+            qtyPulled: item.qty_pulled ?? 0,
+          })) || []
+
+        startSessionWithExistingData(
+          request.id,
+          request.request_id,
+          request.tech_name,
+          request.truck_number,
+          request.priority,
+          items,
+          existingPulls
+        )
+
+        setViewState('readonly')
+        return
+      }
+
+      // New pull - start fresh session
       startSession(
         request.id,
         request.request_id,
@@ -256,6 +282,103 @@ export default function PullPage() {
           >
             Return to Queue
           </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (viewState === 'readonly') {
+    return (
+      <div className="min-h-screen bg-gray-50 safe-all flex flex-col">
+        {/* Header */}
+        <header className="bg-white border-b border-gray-200 sticky top-0 z-10 safe-top">
+          <div className="max-w-4xl mx-auto px-6 py-4">
+            <div className="flex items-center justify-between mb-3">
+              <button
+                onClick={() => router.push('/queue')}
+                className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+              >
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 19l-7-7 7-7"
+                  />
+                </svg>
+                <span className="text-lg">Back</span>
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  {request.tech_name}
+                </h1>
+                <p className="text-gray-500">
+                  Request #{request.request_id}
+                  {request.truck_number && ` - Truck ${request.truck_number}`}
+                </p>
+              </div>
+              <div className="px-4 py-2 rounded-xl text-lg font-bold bg-blue-100 text-blue-800">
+                COMPLETED
+              </div>
+            </div>
+
+            {/* Completion info */}
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-xl">
+              <p className="text-blue-800 text-sm">
+                This pull was completed on{' '}
+                {new Date(request.pull_completed_at!).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                  hour: 'numeric',
+                  minute: '2-digit',
+                })}
+                {request.pulled_by && ` by ${request.pulled_by}`}
+              </p>
+              {request.has_shortages && (
+                <p className="text-amber-700 text-sm mt-1 font-medium">
+                  This request has shortages and is awaiting resolution.
+                </p>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {/* Items List - Read Only */}
+        <main className="flex-1 overflow-auto pb-32">
+          <div className="max-w-4xl mx-auto px-6 py-6 space-y-4">
+            {currentSession?.entries.map((entry, index) => (
+              <ReadOnlyItemCard
+                key={entry.itemId}
+                entry={entry}
+                index={index + 1}
+                imageUrl={partImages?.[entry.partId] || null}
+              />
+            ))}
+          </div>
+        </main>
+
+        {/* Bottom Action Bar */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 safe-bottom">
+          <div className="max-w-4xl mx-auto px-6 py-4">
+            <button
+              onClick={() => {
+                clearSession()
+                router.push('/queue')
+              }}
+              className="w-full btn-action-lg bg-gray-500 text-white hover:bg-gray-600"
+            >
+              Back to Queue
+            </button>
+          </div>
         </div>
       </div>
     )

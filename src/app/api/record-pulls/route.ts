@@ -43,10 +43,9 @@ export async function POST(req: NextRequest) {
       }
 
       // Determine item status based on quantity pulled
-      let itemStatus = 'pending'
-      if (qtyPulled > 0) {
-        itemStatus = 'pulled'
-      }
+      // 'pulled' = quantity was pulled (full or partial)
+      // 'partial' = processed but zero available (shortage)
+      const itemStatus = qtyPulled > 0 ? 'pulled' : 'partial'
 
       console.log(`  Updating item ${itemId}: qty_pulled=${qtyPulled}, status=${itemStatus}`)
 

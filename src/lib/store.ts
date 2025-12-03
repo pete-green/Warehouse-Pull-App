@@ -15,6 +15,17 @@ interface PullStore {
     items: Omit<PullEntry, 'qtyPulled' | 'isPulled'>[]
   ) => void
 
+  // Start session with existing pull data (for read-only view of completed pulls)
+  startSessionWithExistingData: (
+    requestId: string,
+    requestNumber: string,
+    techName: string,
+    truckNumber: string | null,
+    priority: 'normal' | 'urgent' | 'asap',
+    items: Omit<PullEntry, 'qtyPulled' | 'isPulled'>[],
+    existingPulls: { itemId: string; qtyPulled: number }[]
+  ) => void
+
   updateEntry: (itemId: string, qtyPulled: number) => void
 
   markEntryPulled: (itemId: string, qtyPulled: number) => void
@@ -53,6 +64,30 @@ export const usePullStore = create<PullStore>((set, get) => ({
         entries,
         startedAt: new Date().toISOString(),
         completedAt: null,
+      },
+    })
+  },
+
+  startSessionWithExistingData: (requestId, requestNumber, techName, truckNumber, priority, items, existingPulls) => {
+    // Create a map of itemId -> qtyPulled for quick lookup
+    const pullMap = new Map(existingPulls.map(p => [p.itemId, p.qtyPulled]))
+
+    const entries: PullEntry[] = items.map(item => ({
+      ...item,
+      qtyPulled: pullMap.get(item.itemId) ?? 0,
+      isPulled: true, // All items are already pulled in read-only mode
+    }))
+
+    set({
+      currentSession: {
+        requestId,
+        requestNumber,
+        techName,
+        truckNumber,
+        priority,
+        entries,
+        startedAt: new Date().toISOString(),
+        completedAt: new Date().toISOString(), // Already completed
       },
     })
   },

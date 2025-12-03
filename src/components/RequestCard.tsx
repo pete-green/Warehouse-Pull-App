@@ -65,6 +65,11 @@ export default function RequestCard({ request, onClick }: RequestCardProps) {
             >
               {request.status}
             </span>
+            {request.pull_completed_at && (
+              <span className="px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 border border-blue-300">
+                Pull Complete
+              </span>
+            )}
             {request.has_shortages && (
               <span className="px-3 py-1 rounded-full text-sm font-medium bg-amber-100 text-amber-800 border border-amber-300">
                 Has Shortages
