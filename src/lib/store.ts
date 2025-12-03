@@ -30,6 +30,15 @@ interface PullStore {
 
   markEntryPulled: (itemId: string, qtyPulled: number) => void
 
+  // Add a new entry to the session (for realtime item additions)
+  addEntry: (entry: Omit<PullEntry, 'qtyPulled' | 'isPulled'>) => void
+
+  // Remove an entry from the session (for realtime item removals)
+  removeEntry: (itemId: string) => void
+
+  // Update requested quantity for an entry (for realtime quantity changes)
+  updateEntryRequestedQty: (itemId: string, newQty: number) => void
+
   completeSession: () => void
 
   clearSession: () => void
@@ -118,6 +127,49 @@ export const usePullStore = create<PullStore>((set, get) => ({
         entries: session.entries.map(entry =>
           entry.itemId === itemId
             ? { ...entry, qtyPulled, isPulled: true }
+            : entry
+        ),
+      },
+    })
+  },
+
+  addEntry: (entry) => {
+    const session = get().currentSession
+    if (!session) return
+
+    // Don't add if entry already exists
+    if (session.entries.some(e => e.itemId === entry.itemId)) return
+
+    set({
+      currentSession: {
+        ...session,
+        entries: [...session.entries, { ...entry, qtyPulled: 0, isPulled: false }],
+      },
+    })
+  },
+
+  removeEntry: (itemId) => {
+    const session = get().currentSession
+    if (!session) return
+
+    set({
+      currentSession: {
+        ...session,
+        entries: session.entries.filter(entry => entry.itemId !== itemId),
+      },
+    })
+  },
+
+  updateEntryRequestedQty: (itemId, newQty) => {
+    const session = get().currentSession
+    if (!session) return
+
+    set({
+      currentSession: {
+        ...session,
+        entries: session.entries.map(entry =>
+          entry.itemId === itemId
+            ? { ...entry, requestedQty: newQty }
             : entry
         ),
       },

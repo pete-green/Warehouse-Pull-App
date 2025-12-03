@@ -2,13 +2,14 @@
 
 import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   useRequestDetails,
   useStartProcessing,
   useRecordPulls,
   usePartImages,
 } from '@/hooks/useRequests'
+import { useItemChanges } from '@/hooks/useItemChanges'
 import { usePullStore } from '@/lib/store'
 import { saveSessionOffline, updateEntryOffline } from '@/lib/offline-db'
 import PullItemCard from '@/components/PullItemCard'
@@ -16,6 +17,8 @@ import ReadOnlyItemCard from '@/components/ReadOnlyItemCard'
 import NumberPad from '@/components/NumberPad'
 import PullSummary from '@/components/PullSummary'
 import OfflineIndicator from '@/components/OfflineIndicator'
+import ItemChangeAlert from '@/components/ItemChangeAlert'
+import ConflictResolutionModal, { ConflictResolution } from '@/components/ConflictResolutionModal'
 
 type ViewState = 'loading' | 'pulling' | 'summary' | 'submitting' | 'complete' | 'readonly'
 
@@ -29,6 +32,7 @@ export default function PullPage() {
   const [activeItemId, setActiveItemId] = useState<string | null>(null)
   const [showNumberPad, setShowNumberPad] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [activeConflict, setActiveConflict] = useState<typeof itemChanges[0] | null>(null)
 
   const { data: request, isLoading, error } = useRequestDetails(requestId)
   const startProcessing = useStartProcessing()
@@ -50,6 +54,25 @@ export default function PullPage() {
     getProgress,
     getHasShortages,
   } = usePullStore()
+
+  // Handle item changes callback - adds new items to pull session
+  const handleItemsChanged = useCallback(() => {
+    // Re-fetch will happen via React Query invalidation
+    // New items will be added when the request data updates
+  }, [])
+
+  // Realtime subscription for item changes
+  const {
+    changes: itemChanges,
+    hasConflicts,
+    dismissChange,
+    dismissAllChanges,
+    initializeItems,
+  } = useItemChanges({
+    requestId: request?.id || null,
+    enabled: viewState === 'pulling' && !!request,
+    onItemsChanged: handleItemsChanged,
+  })
 
   // Clear session if it's for a different request
   useEffect(() => {
@@ -207,6 +230,37 @@ export default function PullPage() {
   const handleDone = () => {
     clearSession()
     router.push('/queue')
+  }
+
+  const handleResolveConflict = async (resolution: ConflictResolution) => {
+    try {
+      const response = await fetch('/api/resolve-conflict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(resolution),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to resolve conflict')
+      }
+
+      // Dismiss the conflict from the changes list
+      dismissChange(activeConflict?.id || '')
+      setActiveConflict(null)
+
+      // Refresh the request data
+      // The realtime hook will handle updating the UI
+    } catch (error: any) {
+      console.error('Failed to resolve conflict:', error)
+      alert(`Error: ${error.message}`)
+    }
+  }
+
+  const handleOpenConflict = (conflict: typeof itemChanges[0]) => {
+    if (conflict.type === 'conflict') {
+      setActiveConflict(conflict)
+    }
   }
 
   if (isLoading || viewState === 'loading') {
@@ -471,6 +525,14 @@ export default function PullPage() {
         </div>
       </header>
 
+      {/* Item Change Alerts */}
+      <ItemChangeAlert
+        changes={itemChanges}
+        onDismiss={dismissChange}
+        onDismissAll={dismissAllChanges}
+        onResolveConflict={handleOpenConflict}
+      />
+
       {/* Items List */}
       <main className="flex-1 overflow-auto pb-32">
         <div className="max-w-4xl mx-auto px-6 py-6 space-y-4">
@@ -491,18 +553,25 @@ export default function PullPage() {
       {/* Bottom Action Bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 safe-bottom">
         <div className="max-w-4xl mx-auto px-6 py-4">
+          {hasConflicts && (
+            <div className="mb-3 p-3 bg-amber-100 border border-amber-300 rounded-xl text-amber-800 text-center">
+              <span className="font-semibold">Resolve conflicts before completing pull</span>
+            </div>
+          )}
           <button
             onClick={handleReviewPull}
-            disabled={progress.pulled < progress.total}
+            disabled={progress.pulled < progress.total || hasConflicts}
             className={`w-full btn-action-lg ${
-              progress.pulled >= progress.total
+              progress.pulled >= progress.total && !hasConflicts
                 ? 'bg-green-500 text-white hover:bg-green-600'
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
             }`}
           >
-            {progress.pulled >= progress.total
-              ? 'Review & Complete Pull'
-              : `Complete all ${progress.total - progress.pulled} remaining items`}
+            {hasConflicts
+              ? 'Resolve Conflicts First'
+              : progress.pulled >= progress.total
+                ? 'Review & Complete Pull'
+                : `Complete all ${progress.total - progress.pulled} remaining items`}
           </button>
         </div>
       </div>
@@ -516,6 +585,15 @@ export default function PullPage() {
           description={activeEntry.description}
           onConfirm={handleNumberPadConfirm}
           onCancel={handleNumberPadCancel}
+        />
+      )}
+
+      {/* Conflict Resolution Modal */}
+      {activeConflict && (
+        <ConflictResolutionModal
+          conflict={activeConflict}
+          onResolve={handleResolveConflict}
+          onCancel={() => setActiveConflict(null)}
         />
       )}
     </div>
