@@ -95,6 +95,7 @@ export function useStartProcessing() {
 }
 
 // Record pull quantities for a request
+// Uses API route with service role key to bypass RLS restrictions
 export function useRecordPulls() {
   const queryClient = useQueryClient()
 
@@ -102,51 +103,26 @@ export function useRecordPulls() {
     mutationFn: async ({
       requestId,
       entries,
-      userEmail,
     }: {
       requestId: string
       entries: { itemId: string; qtyPulled: number }[]
-      userEmail: string
+      userEmail: string // kept for backwards compatibility but not used - API gets email from session
     }) => {
-      // Update each item with pull quantities
-      for (const entry of entries) {
-        const { error } = await supabase
-          .from('material_request_items')
-          .update({
-            qty_pulled: entry.qtyPulled,
-            item_status: entry.qtyPulled > 0 ? 'pulled' : 'pending',
-            pulled_at: new Date().toISOString(),
-            pulled_by: userEmail,
-          })
-          .eq('id', entry.itemId)
+      const response = await fetch('/api/record-pulls', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ requestId, entries }),
+      })
 
-        if (error) throw error
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to record pulls')
       }
 
-      // Check if any items have shortages (pulled < requested)
-      const { data: items } = await supabase
-        .from('material_request_items')
-        .select('quantity, qty_pulled')
-        .eq('request_id', requestId)
-
-      const hasShortages = items?.some(
-        (item) => (item.qty_pulled || 0) < item.quantity
-      )
-
-      // Update the request status
-      const { error: requestError } = await supabase
-        .from('material_requests')
-        .update({
-          pull_completed_at: new Date().toISOString(),
-          pulled_by: userEmail,
-          has_shortages: hasShortages || false,
-          // Keep as processing - main app handles status changes
-        })
-        .eq('id', requestId)
-
-      if (requestError) throw requestError
-
-      return { hasShortages }
+      const data = await response.json()
+      return { hasShortages: data.hasShortages }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pending-requests'] })

@@ -42,7 +42,9 @@ A dedicated iPad application for warehouse personnel to digitally record materia
 warehouse-pull-app/
 ├── src/
 │   ├── app/
-│   │   ├── api/auth/[...nextauth]/route.ts  # NextAuth API
+│   │   ├── api/
+│   │   │   ├── auth/[...nextauth]/route.ts  # NextAuth API
+│   │   │   └── record-pulls/route.ts        # Record pull quantities (uses service role key)
 │   │   ├── login/page.tsx                   # Login page
 │   │   ├── queue/page.tsx                   # Request queue
 │   │   ├── pull/[requestId]/page.tsx        # Pull entry screen
@@ -145,8 +147,16 @@ supabase
 ```
 
 ### Record Pulls
+**IMPORTANT**: Uses API route (`/api/record-pulls`) with service role key to bypass RLS policies.
+
 ```typescript
-// Update each item
+// Client calls API route
+const response = await fetch('/api/record-pulls', {
+  method: 'POST',
+  body: JSON.stringify({ requestId, entries }),
+})
+
+// API route (server-side with service role key) updates items
 await supabase
   .from('material_request_items')
   .update({
@@ -156,8 +166,9 @@ await supabase
     pulled_by: userEmail
   })
   .eq('id', entry.itemId)
+  .select() // Verify rows were updated
 
-// Update request
+// Then updates request
 await supabase
   .from('material_requests')
   .update({
@@ -186,6 +197,7 @@ await supabase
 # Supabase (same as Consignment Manager)
 NEXT_PUBLIC_SUPABASE_URL=https://vmjngtmjdrasytgqsvxp.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...  # Required for /api/record-pulls route
 
 # NextAuth (same Google OAuth as Field Materials Request)
 GOOGLE_CLIENT_ID=679419172975-fp32girht9ap1as86ejn31jj8tr1q3t3.apps.googleusercontent.com
@@ -211,6 +223,7 @@ NEXTAUTH_SECRET=...
 - [x] Pull summary screen
 - [x] Supabase submit flow
 - [x] Dexie.js offline database setup
+- [x] API route for record-pulls (fixes RLS issue)
 
 ### Pending
 - [ ] Test on actual iPad hardware
@@ -218,6 +231,26 @@ NEXTAUTH_SECRET=...
 - [ ] Pull-to-refresh on queue
 - [ ] Part image loading (needs Supabase storage setup)
 - [ ] Error boundary components
+
+---
+
+## Bug Fixes
+
+### December 3, 2025 - Pull quantities not persisting
+
+**Problem**: After completing a pull, the quantities weren't being saved to the database. The UI showed success, but returning to the queue and reopening the request showed no pulled quantities.
+
+**Root Cause**: The original code used the Supabase anon key directly from the client to update `material_request_items`. Due to Row Level Security (RLS) policies, the UPDATE succeeded but affected 0 rows (silent failure). The code only checked for `error`, not whether rows were actually updated.
+
+**Solution**: Created `/api/record-pulls` API route that:
+1. Uses the service role key (server-side, bypasses RLS)
+2. Verifies rows were updated using `.select()` after UPDATE
+3. Returns proper errors if updates fail
+
+**Files Changed**:
+- Created: `src/app/api/record-pulls/route.ts`
+- Modified: `src/hooks/useRequests.ts` - `useRecordPulls` now calls API route
+- Modified: `.env.example` - Added `SUPABASE_SERVICE_ROLE_KEY`
 
 ---
 
@@ -256,4 +289,4 @@ When deploying, add the Netlify URL to Google Cloud Console:
 
 ---
 
-*Last updated: December 2, 2025*
+*Last updated: December 3, 2025*
