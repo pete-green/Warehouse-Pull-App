@@ -182,7 +182,7 @@ export default function ConflictResolutionModal({
               <div>
                 <p className="font-semibold text-gray-900">Keep extra (tech will need it)</p>
                 <p className="text-sm text-gray-600">
-                  Send all {conflict.qtyPulled} items. The tech's request will be updated to match.
+                  Send all {conflict.qtyPulled} items. The tech&apos;s request will be updated to match.
                 </p>
               </div>
             </div>
