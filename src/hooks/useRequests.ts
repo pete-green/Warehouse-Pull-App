@@ -131,7 +131,7 @@ export function useRecordPulls() {
   })
 }
 
-// Get part images for items (uses our_part_number since that matches parts.part_id)
+// Get part images for items (uses our_part_number to match request item part numbers)
 export function usePartImages(partNumbers: string[]) {
   return useQuery({
     queryKey: ['part-images', partNumbers],
@@ -141,14 +141,14 @@ export function usePartImages(partNumbers: string[]) {
       const { data, error } = await supabase
         .from('parts')
         .select('part_id, our_part_number, image_url')
-        .in('part_id', partNumbers)
+        .in('our_part_number', partNumbers)
 
       if (error) throw error
 
       const imageMap: Record<string, string | null> = {}
       data?.forEach((part) => {
-        // Map by part_id (which matches our_part_number in request items)
-        imageMap[part.part_id] = part.image_url
+        // Map by our_part_number (which matches our_part_number in request items)
+        imageMap[part.our_part_number] = part.image_url
       })
 
       return imageMap
