@@ -9,6 +9,8 @@ interface NumberPadProps {
   description: string
   onConfirm: (value: number) => void
   onCancel: () => void
+  quantityIncrement?: number | null
+  unitLabel?: string | null
 }
 
 export default function NumberPad({
@@ -18,8 +20,11 @@ export default function NumberPad({
   description,
   onConfirm,
   onCancel,
+  quantityIncrement,
+  unitLabel,
 }: NumberPadProps) {
   const [value, setValue] = useState(initialValue.toString())
+  const increment = quantityIncrement || 1
 
   const handleDigit = (digit: string) => {
     if (value === '0') {
@@ -56,6 +61,7 @@ export default function NumberPad({
   const currentValue = parseInt(value) || 0
   const isOverMax = currentValue > maxValue
   const isShortage = currentValue < maxValue && currentValue > 0
+  const isInvalidIncrement = increment > 1 && currentValue > 0 && currentValue % increment !== 0
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
@@ -66,17 +72,45 @@ export default function NumberPad({
           <p className="text-sm text-gray-600 line-clamp-1">{description}</p>
         </div>
 
+        {/* Unit Label Info */}
+        {(unitLabel || increment > 1) && (
+          <div className="mx-6 mt-4 p-3 bg-blue-50 rounded-xl border border-blue-200 text-center">
+            <p className="text-sm font-medium text-blue-800">
+              {unitLabel ? (
+                <>Enter quantity in <strong>{unitLabel.toUpperCase()}</strong></>
+              ) : (
+                <>Enter quantity</>
+              )}
+              {increment > 1 && (
+                <span className="block text-xs text-blue-600 mt-1">
+                  (must be in increments of {increment})
+                </span>
+              )}
+            </p>
+          </div>
+        )}
+
         {/* Value Display */}
         <div className="px-6 py-6 text-center">
-          <div className="text-6xl font-bold text-gray-900 mb-2">{value}</div>
           <div className="flex items-center justify-center gap-2">
+            <div className="text-6xl font-bold text-gray-900">{value}</div>
+            {unitLabel && (
+              <span className="text-2xl text-gray-400 font-medium">{unitLabel}</span>
+            )}
+          </div>
+          <div className="flex items-center justify-center gap-2 mt-2">
             <span className="text-gray-500">of</span>
             <span className="text-2xl font-semibold text-gray-700">
               {maxValue}
             </span>
             <span className="text-gray-500">requested</span>
           </div>
-          {isShortage && (
+          {isInvalidIncrement && (
+            <p className="text-red-600 font-medium mt-2">
+              Must be a multiple of {increment}
+            </p>
+          )}
+          {isShortage && !isInvalidIncrement && (
             <p className="text-amber-600 font-medium mt-2">
               This will create a shortage of {maxValue - currentValue}
             </p>

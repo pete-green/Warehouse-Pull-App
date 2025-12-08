@@ -74,6 +74,8 @@ export interface PullEntry {
   qtyPulled: number
   imageUrl: string | null
   isPulled: boolean
+  quantityIncrement?: number | null
+  unitLabel?: string | null
 }
 
 export interface PullSession {

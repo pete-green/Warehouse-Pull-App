@@ -93,14 +93,19 @@ export default function PullPage() {
     if (request && !currentSession && viewState === 'loading') {
       // Build items array (used for both new and existing sessions)
       const items =
-        request.items?.map((item) => ({
-          itemId: item.id,
-          partId: item.our_part_number, // Use our_part_number as the lookup key
-          ourPartNumber: item.our_part_number,
-          description: item.description,
-          requestedQty: item.quantity,
-          imageUrl: partImages?.[item.our_part_number] || null,
-        })) || []
+        request.items?.map((item) => {
+          const partDetails = partImages?.[item.our_part_number]
+          return {
+            itemId: item.id,
+            partId: item.our_part_number, // Use our_part_number as the lookup key
+            ourPartNumber: item.our_part_number,
+            description: item.description,
+            requestedQty: item.quantity,
+            imageUrl: partDetails?.imageUrl || null,
+            quantityIncrement: partDetails?.quantityIncrement || null,
+            unitLabel: partDetails?.unitLabel || null,
+          }
+        }) || []
 
       // Check if this request was already completed (has pull_completed_at set)
       if (request.pull_completed_at) {
@@ -414,7 +419,7 @@ export default function PullPage() {
                 key={entry.itemId}
                 entry={entry}
                 index={index + 1}
-                imageUrl={partImages?.[entry.partId] || null}
+                imageUrl={partImages?.[entry.partId]?.imageUrl || null}
               />
             ))}
           </div>
@@ -541,7 +546,7 @@ export default function PullPage() {
               key={entry.itemId}
               entry={entry}
               index={index + 1}
-              imageUrl={partImages?.[entry.partId] || null}
+              imageUrl={partImages?.[entry.partId]?.imageUrl || null}
               onQuantitySelect={() => handleQuantitySelect(entry.itemId)}
               onQuickFull={() => handleQuickFull(entry.itemId)}
               onQuickNone={() => handleQuickNone(entry.itemId)}
@@ -585,6 +590,8 @@ export default function PullPage() {
           description={activeEntry.description}
           onConfirm={handleNumberPadConfirm}
           onCancel={handleNumberPadCancel}
+          quantityIncrement={activeEntry.quantityIncrement}
+          unitLabel={activeEntry.unitLabel}
         />
       )}
 

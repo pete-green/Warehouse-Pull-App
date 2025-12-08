@@ -131,7 +131,15 @@ export function useRecordPulls() {
   })
 }
 
-// Get part images for items (uses our_part_number to match request item part numbers)
+// Part details type for pull app
+export interface PartDetails {
+  imageUrl: string | null
+  quantityIncrement: number | null
+  unitLabel: string | null
+}
+
+// Get part details for items (uses our_part_number to match request item part numbers)
+// Returns images and quantity increment info for display in pull UI
 export function usePartImages(partNumbers: string[]) {
   return useQuery({
     queryKey: ['part-images', partNumbers],
@@ -140,18 +148,23 @@ export function usePartImages(partNumbers: string[]) {
 
       const { data, error } = await supabase
         .from('parts')
-        .select('part_id, our_part_number, image_url')
+        .select('part_id, our_part_number, image_url, quantity_increment, unit_label')
         .in('our_part_number', partNumbers)
 
       if (error) throw error
 
-      const imageMap: Record<string, string | null> = {}
-      data?.forEach((part) => {
+      // Return comprehensive part details map
+      const detailsMap: Record<string, PartDetails> = {}
+      data?.forEach((part: any) => {
         // Map by our_part_number (which matches our_part_number in request items)
-        imageMap[part.our_part_number] = part.image_url
+        detailsMap[part.our_part_number] = {
+          imageUrl: part.image_url,
+          quantityIncrement: part.quantity_increment,
+          unitLabel: part.unit_label,
+        }
       })
 
-      return imageMap
+      return detailsMap
     },
     enabled: partNumbers.length > 0,
   })
