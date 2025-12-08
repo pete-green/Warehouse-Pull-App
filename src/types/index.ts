@@ -27,6 +27,12 @@ export interface MaterialRequest {
   pull_completed_at?: string | null
   pulled_by?: string | null
   has_shortages?: boolean
+  // Delivery tracking fields
+  delivery_truck_id?: string | null
+  dispatched_at?: string | null
+  dispatched_by?: string | null
+  delivered_at?: string | null
+  delivered_by?: string | null
   // Nested items
   items?: MaterialRequestItem[]
 }

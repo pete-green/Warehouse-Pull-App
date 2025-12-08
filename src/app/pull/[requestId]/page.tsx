@@ -19,8 +19,9 @@ import PullSummary from '@/components/PullSummary'
 import OfflineIndicator from '@/components/OfflineIndicator'
 import ItemChangeAlert from '@/components/ItemChangeAlert'
 import ConflictResolutionModal, { ConflictResolution } from '@/components/ConflictResolutionModal'
+import TruckSelectionModal from '@/components/TruckSelectionModal'
 
-type ViewState = 'loading' | 'pulling' | 'summary' | 'submitting' | 'complete' | 'readonly'
+type ViewState = 'loading' | 'pulling' | 'summary' | 'submitting' | 'complete' | 'readonly' | 'select-truck'
 
 export default function PullPage() {
   const params = useParams()
@@ -224,12 +225,27 @@ export default function PullPage() {
       })
 
       completeSession()
-      setViewState('complete')
+
+      // If this is a delivery order, prompt for truck selection
+      if (request?.delivery_method === 'delivery') {
+        setIsSubmitting(false)
+        setViewState('select-truck')
+      } else {
+        setViewState('complete')
+      }
     } catch (err) {
       console.error('Failed to submit pull:', err)
       // Stay on summary for retry
       setIsSubmitting(false)
     }
+  }
+
+  const handleTruckSelectionComplete = () => {
+    setViewState('complete')
+  }
+
+  const handleSkipTruckSelection = () => {
+    setViewState('complete')
   }
 
   const handleDone = () => {
@@ -297,6 +313,17 @@ export default function PullPage() {
           </button>
         </div>
       </div>
+    )
+  }
+
+  // Truck selection modal for delivery orders
+  if (viewState === 'select-truck') {
+    return (
+      <TruckSelectionModal
+        requestId={request.id}
+        onComplete={handleTruckSelectionComplete}
+        onSkip={handleSkipTruckSelection}
+      />
     )
   }
 

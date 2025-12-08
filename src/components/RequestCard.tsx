@@ -1,6 +1,8 @@
 'use client'
 
 import { MaterialRequest } from '@/types'
+import { useDispatchDelivery } from '@/hooks/useTrucks'
+import { useState } from 'react'
 
 interface RequestCardProps {
   request: MaterialRequest
@@ -8,6 +10,29 @@ interface RequestCardProps {
 }
 
 export default function RequestCard({ request, onClick }: RequestCardProps) {
+  const dispatchDelivery = useDispatchDelivery()
+  const [isDispatching, setIsDispatching] = useState(false)
+
+  // Check if this is a delivery order that needs dispatch
+  const isDelivery = request.delivery_method === 'delivery'
+  const isPullComplete = !!request.pull_completed_at
+  const hasTruckAssigned = !!request.delivery_truck_id
+  const isDispatched = !!request.dispatched_at
+  const needsDispatch = isDelivery && isPullComplete && hasTruckAssigned && !isDispatched
+
+  const handleDispatch = async (e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent card click navigation
+    if (isDispatching) return
+
+    setIsDispatching(true)
+    try {
+      await dispatchDelivery.mutateAsync({ requestId: request.id })
+    } catch (error) {
+      console.error('Failed to dispatch:', error)
+    } finally {
+      setIsDispatching(false)
+    }
+  }
   const itemCount = request.items?.length || request.total_items || 0
   const totalQty = request.items?.reduce((sum, item) => sum + item.quantity, 0) || request.total_quantity || 0
 
@@ -46,11 +71,13 @@ export default function RequestCard({ request, onClick }: RequestCardProps) {
   }
 
   return (
-    <button
-      onClick={onClick}
-      className="w-full card-touch text-left hover:shadow-md transition-shadow active:scale-[0.99]"
-    >
-      <div className="flex items-start justify-between gap-4">
+    <div className="w-full card-touch text-left hover:shadow-md transition-shadow">
+      <div
+        onClick={onClick}
+        className="flex items-start justify-between gap-4 cursor-pointer active:scale-[0.99]"
+        role="button"
+        tabIndex={0}
+      >
         {/* Main Content */}
         <div className="flex-1 min-w-0">
           {/* Header with badges */}
@@ -73,6 +100,17 @@ export default function RequestCard({ request, onClick }: RequestCardProps) {
             {request.has_shortages && (
               <span className="px-3 py-1 rounded-full text-sm font-medium bg-amber-100 text-amber-800 border border-amber-300">
                 Has Shortages
+              </span>
+            )}
+            {/* Delivery/Dispatch State Badges */}
+            {isDelivery && hasTruckAssigned && !isDispatched && (
+              <span className="px-3 py-1 rounded-full text-sm font-medium bg-cyan-100 text-cyan-800 border border-cyan-300">
+                🚚 Truck Assigned
+              </span>
+            )}
+            {isDelivery && isDispatched && (
+              <span className="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 border border-green-300">
+                📍 Dispatched
               </span>
             )}
           </div>
@@ -135,6 +173,31 @@ export default function RequestCard({ request, onClick }: RequestCardProps) {
           </svg>
         </div>
       </div>
-    </button>
+
+      {/* Dispatch Button - shown for delivery orders ready for dispatch */}
+      {needsDispatch && (
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          <button
+            onClick={handleDispatch}
+            disabled={isDispatching}
+            className="w-full py-3 px-4 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 active:bg-green-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {isDispatching ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                Dispatching...
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Dispatch Delivery
+              </>
+            )}
+          </button>
+        </div>
+      )}
+    </div>
   )
 }
