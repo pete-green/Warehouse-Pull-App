@@ -2,6 +2,7 @@
 
 import { MaterialRequest } from '@/types'
 import { useDispatchDelivery } from '@/hooks/useTrucks'
+import { useFulfillPickup } from '@/hooks/useRequests'
 import { useState } from 'react'
 
 interface RequestCardProps {
@@ -11,14 +12,22 @@ interface RequestCardProps {
 
 export default function RequestCard({ request, onClick }: RequestCardProps) {
   const dispatchDelivery = useDispatchDelivery()
+  const fulfillPickup = useFulfillPickup()
   const [isDispatching, setIsDispatching] = useState(false)
+  const [isFulfilling, setIsFulfilling] = useState(false)
 
   // Check if this is a delivery order that needs dispatch
   const isDelivery = request.delivery_method === 'delivery'
+  const isPickup = request.delivery_method === 'pickup'
   const isPullComplete = !!request.pull_completed_at
   const hasTruckAssigned = !!request.delivery_truck_id
   const isDispatched = !!request.dispatched_at
+  const hasNoShortages = !request.has_shortages
+  const notFulfilled = request.status !== 'fulfilled'
   const needsDispatch = isDelivery && isPullComplete && hasTruckAssigned && !isDispatched
+
+  // Check if this pickup order can be marked as fulfilled
+  const canMarkPickedUp = isPickup && isPullComplete && hasNoShortages && notFulfilled
 
   const handleDispatch = async (e: React.MouseEvent) => {
     e.stopPropagation() // Prevent card click navigation
@@ -31,6 +40,20 @@ export default function RequestCard({ request, onClick }: RequestCardProps) {
       console.error('Failed to dispatch:', error)
     } finally {
       setIsDispatching(false)
+    }
+  }
+
+  const handleFulfillPickup = async (e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent card click navigation
+    if (isFulfilling) return
+
+    setIsFulfilling(true)
+    try {
+      await fulfillPickup.mutateAsync({ requestId: request.id })
+    } catch (error) {
+      console.error('Failed to fulfill pickup:', error)
+    } finally {
+      setIsFulfilling(false)
     }
   }
   const itemCount = request.items?.length || request.total_items || 0
@@ -113,6 +136,12 @@ export default function RequestCard({ request, onClick }: RequestCardProps) {
                 📍 Dispatched
               </span>
             )}
+            {/* Pickup State Badge */}
+            {canMarkPickedUp && (
+              <span className="px-3 py-1 rounded-full text-sm font-medium bg-emerald-100 text-emerald-800 border border-emerald-300 animate-pulse">
+                📦 Ready for Pickup
+              </span>
+            )}
           </div>
 
           {/* Tech & Job Info */}
@@ -193,6 +222,31 @@ export default function RequestCard({ request, onClick }: RequestCardProps) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
                 Dispatch Delivery
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Mark Picked Up Button - shown for pickup orders ready for fulfillment */}
+      {canMarkPickedUp && (
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          <button
+            onClick={handleFulfillPickup}
+            disabled={isFulfilling}
+            className="w-full py-3 px-4 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 active:bg-emerald-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {isFulfilling ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                Marking as Picked Up...
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Mark Picked Up
               </>
             )}
           </button>

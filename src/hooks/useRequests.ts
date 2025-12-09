@@ -131,6 +131,34 @@ export function useRecordPulls() {
   })
 }
 
+// Fulfill a pickup order (marks as fulfilled when tech picks up)
+export function useFulfillPickup() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ requestId }: { requestId: string }) => {
+      const response = await fetch('/api/fulfill-pickup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ requestId }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to fulfill pickup')
+      }
+
+      return response.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pending-requests'] })
+      queryClient.invalidateQueries({ queryKey: ['request'] })
+    },
+  })
+}
+
 // Part details type for pull app
 export interface PartDetails {
   imageUrl: string | null
