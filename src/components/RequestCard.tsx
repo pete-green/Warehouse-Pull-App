@@ -1,9 +1,10 @@
 'use client'
 
 import { MaterialRequest } from '@/types'
-import { useDispatchDelivery } from '@/hooks/useTrucks'
+import { useDispatchDelivery, useAssignDeliveryTruck } from '@/hooks/useTrucks'
 import { useFulfillPickup } from '@/hooks/useRequests'
 import { useState } from 'react'
+import TruckSelectionModal from './TruckSelectionModal'
 
 interface RequestCardProps {
   request: MaterialRequest
@@ -15,6 +16,7 @@ export default function RequestCard({ request, onClick }: RequestCardProps) {
   const fulfillPickup = useFulfillPickup()
   const [isDispatching, setIsDispatching] = useState(false)
   const [isFulfilling, setIsFulfilling] = useState(false)
+  const [showTruckModal, setShowTruckModal] = useState(false)
 
   // Check if this is a delivery order that needs dispatch
   const isDelivery = request.delivery_method === 'delivery'
@@ -25,6 +27,9 @@ export default function RequestCard({ request, onClick }: RequestCardProps) {
   const hasNoShortages = !request.has_shortages
   const notFulfilled = request.status !== 'fulfilled'
   const needsDispatch = isDelivery && isPullComplete && hasTruckAssigned && !isDispatched
+
+  // Check if this delivery needs a truck assigned (pull complete but no truck)
+  const needsTruckAssignment = isDelivery && isPullComplete && !hasTruckAssigned
 
   // Check if this pickup order can be marked as fulfilled
   const canMarkPickedUp = isPickup && isPullComplete && hasNoShortages && notFulfilled
@@ -55,6 +60,15 @@ export default function RequestCard({ request, onClick }: RequestCardProps) {
     } finally {
       setIsFulfilling(false)
     }
+  }
+
+  const handleAssignTruckClick = (e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent card click navigation
+    setShowTruckModal(true)
+  }
+
+  const handleTruckAssignComplete = () => {
+    setShowTruckModal(false)
   }
   const itemCount = request.items?.length || request.total_items || 0
   const totalQty = request.items?.reduce((sum, item) => sum + item.quantity, 0) || request.total_quantity || 0
@@ -126,6 +140,11 @@ export default function RequestCard({ request, onClick }: RequestCardProps) {
               </span>
             )}
             {/* Delivery/Dispatch State Badges */}
+            {needsTruckAssignment && (
+              <span className="px-3 py-1 rounded-full text-sm font-medium bg-orange-100 text-orange-800 border border-orange-300 animate-pulse">
+                🚚 Needs Truck
+              </span>
+            )}
             {isDelivery && hasTruckAssigned && !isDispatched && (
               <span className="px-3 py-1 rounded-full text-sm font-medium bg-cyan-100 text-cyan-800 border border-cyan-300">
                 🚚 Truck Assigned
@@ -251,6 +270,30 @@ export default function RequestCard({ request, onClick }: RequestCardProps) {
             )}
           </button>
         </div>
+      )}
+
+      {/* Assign Truck Button - shown for delivery orders with completed pull but no truck assigned */}
+      {needsTruckAssignment && (
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          <button
+            onClick={handleAssignTruckClick}
+            className="w-full py-3 px-4 bg-orange-500 text-white font-semibold rounded-xl hover:bg-orange-600 active:bg-orange-700 transition-colors flex items-center justify-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+            </svg>
+            Assign Delivery Truck
+          </button>
+        </div>
+      )}
+
+      {/* Truck Selection Modal */}
+      {showTruckModal && (
+        <TruckSelectionModal
+          requestId={request.id}
+          onComplete={handleTruckAssignComplete}
+          onSkip={() => setShowTruckModal(false)}
+        />
       )}
     </div>
   )
